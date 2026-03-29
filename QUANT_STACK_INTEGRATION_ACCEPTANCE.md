@@ -13,7 +13,7 @@ Dit document legt de **eerste formele acceptance run** vast: QuantBuild + QuantB
 |------|--------|-------------------|-----------|
 | quantbuildE1 | `v2-development` | `3cf42b81549223a9fa2804f6c1a4e6c414cbab63` | Integrate QuantLog emitter into live runner and add post-run pipeline |
 | quantBridge-v.1 | `main` | `ccdea09a4e83ef1c401b14aae18d20c2ecec7cc9` | Make observability sink QuantLog-compatible with canonical envelope |
-| quantLog v.1 | `main` | `4c75b0b0356b4a686c5b4539f10fd91583bdd440` | Acceptance dossier + QuantLog CLI |
+| quantLog v.1 | `main` | `c4f12fd10853ac64aa5cbb83067c87b1201df0cd` | Acceptance 001 ingevuld + QuantLog CLI |
 
 ---
 
