@@ -6,6 +6,12 @@ QuantLog v1 is voorbij documentatie en zit nu in werkende MVP-implementatie met 
 
 Huidige status: **buildable + testable + replayable**.
 
+Formeel architectuurbeleid is nu vastgelegd via:
+
+- `EVENT_VERSIONING_POLICY.md`
+- `QUANTLOG_GUARDRAILS.md`
+- `SCHEMA_CHANGE_CHECKLIST.md`
+
 ---
 
 ## 2. Wat is gerealiseerd
@@ -76,23 +82,31 @@ Hiermee is overlap tussen guard-logica en action-logica verwijderd.
 3. **Valideerbare contracten** via harde validator i.p.v. vrijblijvende schema-afspraak.  
 4. **Systeemgedrag aantoonbaar** via smoke runner en gegenereerde sample days.
 
+Non-negotiables die nu expliciet zijn vastgelegd:
+
+- QuantLog is de waarheidlaag (System of Record).
+- Correlatie-ID's zijn contractueel verplicht.
+- Backward replay-compatibiliteit is verplicht.
+- CI gates zijn merge-voorwaarde.
+- QuantLog scope blijft beperkt (geen strategy/execution business logic).
+
 ---
 
 ## 4. Bekende grenzen van huidige v1
 
-- Geen CI pipeline automation yet (nu handmatig runnen).
+- CI pipeline automation staat nu actief (local + GitHub Actions).
 - Geen uitgebreid metrics dashboard (bewuste scope-keuze).
 - Geen multi-process sequence arbitration (nu per emitter-instance monotonic).
-- Nog geen formele contract tests tegen externe QuantBuild/QuantBridge repos.
+- Contract tests zijn toegevoegd via fixtures + `contract_check.py`.
 
 ---
 
 ## 5. Aanbevolen volgende stappen
 
-1. CI gate toevoegen (tests + smoke + sample-day validate/summarize).  
-2. Contract test fixtures uit echte QuantBuild/QuantBridge dry-run logs.  
-3. `generate_sample_day.py` uitbreiden met failsafe/governance scenario's.  
-4. Eerste "quality scorecard" per run (schema quality + replay integrity + ops health).
+1. Contract fixtures periodiek verversen met echte runtime logs uit QuantBuild/QuantBridge.  
+2. Historische opslag van run-quality scores (trend per dag/run).  
+3. Merge policy aanscherpen op score + warnings limieten.  
+4. Event contract versioning policy formaliseren voor v1 -> v1.x upgrades.
 
 ---
 
@@ -101,4 +115,6 @@ Hiermee is overlap tussen guard-logica en action-logica verwijderd.
 QuantLog v1 heeft nu een stevig technisch fundament dat geschikt is voor gecontroleerde paper-operations en regressie-validatie.
 
 Aanbevolen beslissing: **go for CI hardening + contract integration phase**.
+
+Update: deze fase is uitgevoerd; focus verschuift naar periodieke contract fixture refresh en quality trend governance.
 

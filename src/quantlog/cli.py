@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from quantlog.ingest.health import detect_audit_gaps, emit_audit_gap_events
+from quantlog.quality.service import score_run
 from quantlog.replay.service import replay_trace
 from quantlog.summarize.service import summarize_path
 from quantlog.validate.validator import validate_path
@@ -108,6 +109,32 @@ def cmd_check_ingest_health(args: argparse.Namespace) -> int:
     return 0 if not gaps else 3
 
 
+def cmd_score_run(args: argparse.Namespace) -> int:
+    report = score_run(
+        path=Path(args.path),
+        max_gap_seconds=float(args.max_gap_seconds),
+        pass_threshold=int(args.pass_threshold),
+    )
+    output = {
+        "score": report.score,
+        "grade": report.grade,
+        "pass_threshold": report.pass_threshold,
+        "passed": report.passed,
+        "events_total": report.events_total,
+        "invalid_json_lines": report.invalid_json_lines,
+        "errors_total": report.errors_total,
+        "warnings_total": report.warnings_total,
+        "duplicate_event_ids": report.duplicate_event_ids,
+        "out_of_order_events": report.out_of_order_events,
+        "missing_trace_ids": report.missing_trace_ids,
+        "missing_order_ref_execution": report.missing_order_ref_execution,
+        "audit_gaps": report.audit_gaps,
+        "penalty_breakdown": report.penalty_breakdown,
+    }
+    _print_json(output)
+    return 0 if report.passed else 4
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="QuantLog v1 CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -145,6 +172,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit audit_gap_detected events into the same event store path",
     )
     health_parser.set_defaults(func=cmd_check_ingest_health)
+
+    score_parser = subparsers.add_parser(
+        "score-run", help="Compute run quality scorecard"
+    )
+    score_parser.add_argument("--path", required=True, help="Path to JSONL file or folder")
+    score_parser.add_argument(
+        "--max-gap-seconds",
+        default=300,
+        type=float,
+        help="Gap threshold used by quality score",
+    )
+    score_parser.add_argument(
+        "--pass-threshold",
+        default=95,
+        type=int,
+        help="Minimum score for pass",
+    )
+    score_parser.set_defaults(func=cmd_score_run)
 
     return parser
 

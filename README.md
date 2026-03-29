@@ -87,6 +87,12 @@ Emit `audit_gap_detected` events for detected gaps:
 python -m quantlog.cli check-ingest-health --path data/events/sample --max-gap-seconds 120 --emit-audit-gap
 ```
 
+Run quality scorecard:
+
+```powershell
+python -m quantlog.cli score-run --path data/events/sample --max-gap-seconds 300 --pass-threshold 95
+```
+
 ## Build and test workflows
 
 Unit tests:
@@ -109,6 +115,25 @@ python -m quantlog.cli validate-events --path data/events/generated/2026-03-29
 python -m quantlog.cli summarize-day --path data/events/generated/2026-03-29
 ```
 
+Generate expanded scenarios:
+
+```powershell
+python scripts/generate_sample_day.py --output-path data/events/generated --date 2026-03-29 --traces 50 --include-session-restart-probe
+```
+
+Generate anomaly day for negative quality tests:
+
+```powershell
+python scripts/generate_sample_day.py --output-path data/events/generated --date 2026-03-29 --traces 25 --inject-anomalies
+python -m quantlog.cli score-run --path data/events/generated/2026-03-29 --pass-threshold 95
+```
+
+Contract integration check:
+
+```powershell
+python scripts/contract_check.py --contracts-path tests/fixtures/contracts --max-warnings 0
+```
+
 Local CI gates:
 
 ```powershell
@@ -125,5 +150,9 @@ Local CI gates:
 
 - `QUANTLOG_V1_ARCHITECTURE.md` - architecture and MVP boundaries
 - `EVENT_SCHEMA.md` - canonical schema and payload definitions
+- `EVENT_VERSIONING_POLICY.md` - formal schema/version compatibility policy
+- `QUANTLOG_GUARDRAILS.md` - scope boundaries and non-negotiables
+- `SCHEMA_CHANGE_CHECKLIST.md` - required checklist for schema changes
 - `REPLAY_RUNBOOK.md` - incident/replay/ops procedures
 - `MENTOR_UPDATE.md` - engineering status and next-phase direction
+- `ROADMAP_EXECUTION_STATUS.md` - full roadmap status and completion log
