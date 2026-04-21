@@ -676,6 +676,10 @@ class _DecisionChainAnchor:
     decision_cycle_id: str
     event_type: str
     sort_key: tuple[Any, ...]
+    run_id: str
+    session_id: str
+    trace_id: str
+    symbol: str | None
 
 
 _FALLBACK_SORT_END = datetime(9999, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
@@ -700,6 +704,79 @@ def _decision_cycle_sequence_issues(anchors: list[_DecisionChainAnchor]) -> list
 
     for dc_id, group in by_cycle.items():
         sorted_group = sorted(group, key=lambda x: x.sort_key)
+
+        ref = sorted_group[0]
+        ref_run, ref_sess, ref_trace = ref.run_id, ref.session_id, ref.trace_id
+        symbols_nonempty = [a.symbol for a in sorted_group if a.symbol]
+        ref_symbol = symbols_nonempty[0] if symbols_nonempty else None
+
+        for a in sorted_group:
+            if a.run_id != ref_run:
+                issues.append(
+                    ValidationIssue(
+                        level="error",
+                        path=a.path,
+                        line_number=a.line_number,
+                        message=(
+                            "decision_cycle_run_id_mismatch: "
+                            f"decision_cycle_id={dc_id!r} "
+                            f"expected_run_id={ref_run!r} got_run_id={a.run_id!r}"
+                        ),
+                    )
+                )
+            if a.session_id != ref_sess:
+                issues.append(
+                    ValidationIssue(
+                        level="error",
+                        path=a.path,
+                        line_number=a.line_number,
+                        message=(
+                            "decision_cycle_session_id_mismatch: "
+                            f"decision_cycle_id={dc_id!r} "
+                            f"expected_session_id={ref_sess!r} got_session_id={a.session_id!r}"
+                        ),
+                    )
+                )
+            if a.trace_id != ref_trace:
+                issues.append(
+                    ValidationIssue(
+                        level="error",
+                        path=a.path,
+                        line_number=a.line_number,
+                        message=(
+                            "decision_cycle_trace_id_mismatch: "
+                            f"decision_cycle_id={dc_id!r} "
+                            f"expected_trace_id={ref_trace!r} got_trace_id={a.trace_id!r}"
+                        ),
+                    )
+                )
+            if ref_symbol is not None and a.symbol is not None and a.symbol != ref_symbol:
+                issues.append(
+                    ValidationIssue(
+                        level="error",
+                        path=a.path,
+                        line_number=a.line_number,
+                        message=(
+                            "decision_cycle_symbol_mismatch: "
+                            f"decision_cycle_id={dc_id!r} "
+                            f"expected_symbol={ref_symbol!r} got_symbol={a.symbol!r}"
+                        ),
+                    )
+                )
+            elif ref_symbol is not None and a.symbol is None:
+                issues.append(
+                    ValidationIssue(
+                        level="warn",
+                        path=a.path,
+                        line_number=a.line_number,
+                        message=(
+                            "decision_cycle_symbol_omitted: "
+                            f"decision_cycle_id={dc_id!r} "
+                            f"expected_symbol={ref_symbol!r}"
+                        ),
+                    )
+                )
+
         trade_lines = [x for x in sorted_group if x.event_type == "trade_action"]
 
         if not trade_lines:
@@ -827,15 +904,32 @@ def validate_path(path: Path) -> ValidationReport:
                     and isinstance(dc, str)
                     and dc.strip()
                 ):
-                    chain_anchors.append(
-                        _DecisionChainAnchor(
-                            path=raw_line.path,
-                            line_number=raw_line.line_number,
-                            decision_cycle_id=dc.strip(),
-                            event_type=et,
-                            sort_key=_timestamp_sort_key(ts, raw_line.path, raw_line.line_number),
+                    rid = ev.get("run_id")
+                    sess = ev.get("session_id")
+                    trid = ev.get("trace_id")
+                    if (
+                        isinstance(rid, str)
+                        and rid.strip()
+                        and isinstance(sess, str)
+                        and sess.strip()
+                        and isinstance(trid, str)
+                        and trid.strip()
+                    ):
+                        chain_anchors.append(
+                            _DecisionChainAnchor(
+                                path=raw_line.path,
+                                line_number=raw_line.line_number,
+                                decision_cycle_id=dc.strip(),
+                                event_type=et,
+                                sort_key=_timestamp_sort_key(
+                                    ts, raw_line.path, raw_line.line_number
+                                ),
+                                run_id=rid.strip(),
+                                session_id=sess.strip(),
+                                trace_id=trid.strip(),
+                                symbol=_canonical_symbol(ev),
+                            )
                         )
-                    )
 
     seq_issues = _decision_cycle_sequence_issues(chain_anchors)
     issues.extend(seq_issues)

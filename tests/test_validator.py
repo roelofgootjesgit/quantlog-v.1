@@ -582,6 +582,105 @@ class TestValidator(unittest.TestCase):
             msgs = [i.message for i in report.issues if i.level == "error"]
             self.assertTrue(any(m.startswith("duplicate_trade_action_decision_cycle") for m in msgs))
 
+    def test_decision_cycle_trace_id_must_match_across_chain(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir)
+            f = path / "events.jsonl"
+            se = {
+                "event_id": "00000000-0000-0000-0000-000000000111",
+                "event_type": "signal_evaluated",
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:00Z",
+                "ingested_at_utc": "2026-03-29T18:00:01Z",
+                "source_system": "quantbuild",
+                "source_component": "signal_engine",
+                "environment": "paper",
+                "run_id": "run_tr",
+                "session_id": "session_tr",
+                "source_seq": 1,
+                "trace_id": "trace_a",
+                "decision_cycle_id": "dc_trace_enforce",
+                "severity": "info",
+                "payload": {
+                    "signal_type": "ict_sweep",
+                    "signal_direction": "LONG",
+                    "confidence": 0.5,
+                },
+            }
+            ta = {
+                "event_id": "00000000-0000-0000-0000-000000000112",
+                "event_type": "trade_action",
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:05Z",
+                "ingested_at_utc": "2026-03-29T18:00:05Z",
+                "source_system": "quantbuild",
+                "source_component": "decision_engine",
+                "environment": "paper",
+                "run_id": "run_tr",
+                "session_id": "session_tr",
+                "source_seq": 1,
+                "trace_id": "trace_b",
+                "decision_cycle_id": "dc_trace_enforce",
+                "severity": "info",
+                "payload": {
+                    "decision": "NO_ACTION",
+                    "reason": "no_setup",
+                },
+            }
+            f.write_text(json.dumps(se) + "\n" + json.dumps(ta) + "\n", encoding="utf-8")
+            report = validate_path(path)
+            msgs = [i.message for i in report.issues if i.level == "error"]
+            self.assertTrue(any(m.startswith("decision_cycle_trace_id_mismatch") for m in msgs))
+
+    def test_decision_cycle_symbol_mismatch_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir)
+            f = path / "events.jsonl"
+            se = {
+                "event_id": "00000000-0000-0000-0000-000000000121",
+                "event_type": "signal_evaluated",
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:00Z",
+                "ingested_at_utc": "2026-03-29T18:00:01Z",
+                "source_system": "quantbuild",
+                "source_component": "signal_engine",
+                "environment": "paper",
+                "run_id": "run_sym",
+                "session_id": "session_sym",
+                "source_seq": 1,
+                "trace_id": "trace_sym",
+                "symbol": "XAUUSD",
+                "decision_cycle_id": "dc_sym_enforce",
+                "severity": "info",
+                "payload": {
+                    "signal_type": "ict_sweep",
+                    "signal_direction": "LONG",
+                    "confidence": 0.5,
+                },
+            }
+            ta = {
+                "event_id": "00000000-0000-0000-0000-000000000122",
+                "event_type": "trade_action",
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:05Z",
+                "ingested_at_utc": "2026-03-29T18:00:05Z",
+                "source_system": "quantbuild",
+                "source_component": "decision_engine",
+                "environment": "paper",
+                "run_id": "run_sym",
+                "session_id": "session_sym",
+                "source_seq": 1,
+                "trace_id": "trace_sym",
+                "symbol": "EURUSD",
+                "decision_cycle_id": "dc_sym_enforce",
+                "severity": "info",
+                "payload": {"decision": "NO_ACTION", "reason": "no_setup"},
+            }
+            f.write_text(json.dumps(se) + "\n" + json.dumps(ta) + "\n", encoding="utf-8")
+            report = validate_path(path)
+            msgs = [i.message for i in report.issues if i.level == "error"]
+            self.assertTrue(any(m.startswith("decision_cycle_symbol_mismatch") for m in msgs))
+
     def test_decision_chain_order_trade_action_must_follow_signal_evaluated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             path = Path(tmp_dir)
