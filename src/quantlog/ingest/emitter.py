@@ -45,6 +45,7 @@ class EventEmitter:
         symbol: str | None = None,
         timestamp_utc: str | None = None,
         source_seq: int | None = None,
+        decision_cycle_id: str | None = None,
     ) -> dict[str, Any]:
         ts = timestamp_utc or utc_now_iso()
         ingested_at = utc_now_iso()
@@ -81,6 +82,8 @@ class EventEmitter:
             event["strategy_id"] = strategy_id
         if symbol:
             event["symbol"] = symbol
+        if decision_cycle_id:
+            event["decision_cycle_id"] = decision_cycle_id
 
         target = self._target_file(ts)
         with target.open("a", encoding="utf-8") as handle:

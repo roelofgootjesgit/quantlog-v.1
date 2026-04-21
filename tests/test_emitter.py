@@ -22,6 +22,7 @@ class TestEmitter(unittest.TestCase):
             emitter.emit(
                 event_type="signal_evaluated",
                 trace_id="trace_seq",
+                decision_cycle_id="dc_emit_seq",
                 payload={
                     "signal_type": "ict_sweep",
                     "signal_direction": "LONG",
@@ -31,7 +32,12 @@ class TestEmitter(unittest.TestCase):
             emitter.emit(
                 event_type="trade_action",
                 trace_id="trace_seq",
-                payload={"decision": "ENTER", "reason": "ok"},
+                decision_cycle_id="dc_emit_seq",
+                payload={
+                    "decision": "ENTER",
+                    "reason": "ok",
+                    "trade_id": "trade_emit_seq_1",
+                },
             )
 
             replay_items = replay_trace(base_path, "trace_seq")

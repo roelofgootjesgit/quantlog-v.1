@@ -23,6 +23,7 @@ class TestQuality(unittest.TestCase):
                 event_type="signal_evaluated",
                 trace_id="trace_quality_1",
                 timestamp_utc="2026-03-29T18:00:00Z",
+                decision_cycle_id="dc_quality_1",
                 payload={
                     "signal_type": "ict_sweep",
                     "signal_direction": "LONG",
@@ -33,12 +34,14 @@ class TestQuality(unittest.TestCase):
                 event_type="risk_guard_decision",
                 trace_id="trace_quality_1",
                 timestamp_utc="2026-03-29T18:00:01Z",
+                decision_cycle_id="dc_quality_1",
                 payload={"guard_name": "spread_guard", "decision": "BLOCK", "reason": "spread"},
             )
             qb.emit(
                 event_type="trade_action",
                 trace_id="trace_quality_1",
                 timestamp_utc="2026-03-29T18:00:02Z",
+                decision_cycle_id="dc_quality_1",
                 payload={"decision": "NO_ACTION", "reason": "risk_blocked"},
             )
 

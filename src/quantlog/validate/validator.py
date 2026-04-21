@@ -24,6 +24,7 @@ from quantlog.events.schema import (
     RISK_GUARD_DECISIONS,
     TRADE_ACTION_DECISIONS,
     TRADE_EXECUTED_DIRECTIONS,
+    DECISION_CHAIN_EVENT_TYPES,
 )
 
 
@@ -349,6 +350,20 @@ def validate_raw_event(raw_line: RawEventLine) -> list[ValidationIssue]:
                 )
             )
 
+    ss = event.get("source_system")
+    et_chain = event.get("event_type")
+    if ss == "quantbuild" and et_chain in DECISION_CHAIN_EVENT_TYPES:
+        dcid = event.get("decision_cycle_id")
+        if not isinstance(dcid, str) or not dcid.strip():
+            issues.append(
+                ValidationIssue(
+                    level="error",
+                    path=raw_line.path,
+                    line_number=raw_line.line_number,
+                    message="missing_decision_cycle_id_quantbuild_chain",
+                )
+            )
+
     payload = event.get("payload")
     if payload is not None and not isinstance(payload, dict):
         issues.append(
@@ -415,6 +430,17 @@ def validate_raw_event(raw_line: RawEventLine) -> list[ValidationIssue]:
                         path=raw_line.path,
                         line_number=raw_line.line_number,
                         message=f"invalid_no_action_reason: {reason!r}",
+                    )
+                )
+        elif decision == "ENTER":
+            tid = payload.get("trade_id")
+            if not isinstance(tid, str) or not tid.strip():
+                issues.append(
+                    ValidationIssue(
+                        level="error",
+                        path=raw_line.path,
+                        line_number=raw_line.line_number,
+                        message="trade_action_enter_missing_trade_id",
                     )
                 )
 

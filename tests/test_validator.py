@@ -46,9 +46,11 @@ class TestValidator(unittest.TestCase):
                 "session_id": "session_test",
                 "source_seq": 1,
                 "trace_id": "trace_test",
+                "decision_cycle_id": "dc_missing_reason",
                 "severity": "info",
                 "payload": {
-                    "decision": "ENTER"
+                    "decision": "ENTER",
+                    "trade_id": "trade_missing_reason",
                     # missing required "reason"
                 },
             }
@@ -78,6 +80,7 @@ class TestValidator(unittest.TestCase):
                 "session_id": "session_test_ok",
                 "source_seq": 1,
                 "trace_id": "trace_test_ok",
+                "decision_cycle_id": "dc_ok_signal_evaluated",
                 "severity": "info",
                 "payload": {
                     "signal_type": "ict_sweep",
@@ -90,6 +93,63 @@ class TestValidator(unittest.TestCase):
             report = validate_path(path)
             self.assertEqual(report.events_valid, 1)
             self.assertEqual(len([issue for issue in report.issues if issue.level == "error"]), 0)
+
+    def test_quantbuild_chain_requires_decision_cycle_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir)
+            event_file = path / "events.jsonl"
+            event = {
+                "event_id": "00000000-0000-0000-0000-000000000099",
+                "event_type": "signal_evaluated",
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:00Z",
+                "ingested_at_utc": "2026-03-29T18:00:01Z",
+                "source_system": "quantbuild",
+                "source_component": "signal_engine",
+                "environment": "paper",
+                "run_id": "run_dc",
+                "session_id": "session_dc",
+                "source_seq": 1,
+                "trace_id": "trace_dc",
+                "severity": "info",
+                "payload": {
+                    "signal_type": "ict_sweep",
+                    "signal_direction": "LONG",
+                    "confidence": 0.7,
+                },
+            }
+            event_file.write_text(json.dumps(event) + "\n", encoding="utf-8")
+
+            report = validate_path(path)
+            error_messages = [issue.message for issue in report.issues if issue.level == "error"]
+            self.assertIn("missing_decision_cycle_id_quantbuild_chain", error_messages)
+
+    def test_trade_action_enter_requires_trade_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir)
+            event_file = path / "events.jsonl"
+            event = {
+                "event_id": "00000000-0000-0000-0000-000000000098",
+                "event_type": "trade_action",
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:03Z",
+                "ingested_at_utc": "2026-03-29T18:00:03Z",
+                "source_system": "quantbuild",
+                "source_component": "decision_engine",
+                "environment": "paper",
+                "run_id": "run_tid",
+                "session_id": "session_tid",
+                "source_seq": 1,
+                "trace_id": "trace_tid",
+                "decision_cycle_id": "dc_enter_tid",
+                "severity": "info",
+                "payload": {"decision": "ENTER", "reason": "ok"},
+            }
+            event_file.write_text(json.dumps(event) + "\n", encoding="utf-8")
+
+            report = validate_path(path)
+            error_messages = [issue.message for issue in report.issues if issue.level == "error"]
+            self.assertIn("trade_action_enter_missing_trade_id", error_messages)
 
     def test_signal_evaluated_desk_grade_optional_payload_valid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -108,6 +168,7 @@ class TestValidator(unittest.TestCase):
                 "session_id": "session_upgrade",
                 "source_seq": 1,
                 "trace_id": "trace_upgrade",
+                "decision_cycle_id": "dc_upgrade_desk_grade",
                 "severity": "info",
                 "payload": {
                     "signal_type": "ict_sweep",
@@ -169,6 +230,7 @@ class TestValidator(unittest.TestCase):
                 "session_id": "session_bad_gs",
                 "source_seq": 1,
                 "trace_id": "trace_bad_gs",
+                "decision_cycle_id": "dc_bad_gs",
                 "severity": "info",
                 "payload": {
                     "signal_type": "ict_sweep",
@@ -202,6 +264,7 @@ class TestValidator(unittest.TestCase):
                 "session_id": "session_test_sem",
                 "source_seq": 1,
                 "trace_id": "trace_test_sem",
+                "decision_cycle_id": "dc_enum_sem",
                 "severity": "info",
                 "payload": {"decision": "TRADE", "reason": "legacy_value_should_fail"},
             }
@@ -228,6 +291,7 @@ class TestValidator(unittest.TestCase):
                 "session_id": "session_test_noact",
                 "source_seq": 1,
                 "trace_id": "trace_test_noact",
+                "decision_cycle_id": "dc_no_act_canonical",
                 "severity": "info",
                 "payload": {"decision": "NO_ACTION", "reason": "blocked_by_guard"},
             }
@@ -255,6 +319,7 @@ class TestValidator(unittest.TestCase):
                 "session_id": "session_x",
                 "source_seq": 1,
                 "trace_id": "trace_x",
+                "decision_cycle_id": "dc_null_run_id",
                 "severity": "info",
                 "payload": {"decision": "NO_ACTION", "reason": "no_setup"},
             }
@@ -278,6 +343,7 @@ class TestValidator(unittest.TestCase):
                 "run_id": "run_mono",
                 "session_id": "session_mono",
                 "trace_id": "trace_mono",
+                "decision_cycle_id": "dc_seq_mono",
                 "severity": "info",
             }
             e1 = {
@@ -320,6 +386,7 @@ class TestValidator(unittest.TestCase):
                 "session_id": "session_sd",
                 "source_seq": 1,
                 "trace_id": "trace_sd",
+                "decision_cycle_id": "dc_signal_detected_min",
                 "severity": "info",
                 "payload": {
                     "signal_id": "sig_1",

@@ -4,6 +4,17 @@ from __future__ import annotations
 
 from typing import Final
 
+# QuantBuild decision chain: these require a non-empty ``decision_cycle_id`` on the envelope
+# (see quantmetrics_os / QUANT_STACK_CANONICAL_IDS_AND_GRAINS).
+DECISION_CHAIN_EVENT_TYPES: Final[frozenset[str]] = frozenset(
+    {
+        "signal_detected",
+        "signal_evaluated",
+        "risk_guard_decision",
+        "trade_action",
+    }
+)
+
 REQUIRED_ENVELOPE_FIELDS: Final[set[str]] = {
     "event_id",
     "event_type",

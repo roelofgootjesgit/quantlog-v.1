@@ -27,8 +27,13 @@ class TestReplay(unittest.TestCase):
                 "session_id": "session_replay_test",
                 "source_seq": 2,
                 "trace_id": "trace_replay_test",
+                "decision_cycle_id": "dc_replay_test",
                 "severity": "info",
-                "payload": {"decision": "ENTER", "reason": "ok"},
+                "payload": {
+                    "decision": "ENTER",
+                    "reason": "ok",
+                    "trade_id": "trade_replay_1",
+                },
             }
             second = {
                 "event_id": "00000000-0000-0000-0000-000000000022",
@@ -43,6 +48,7 @@ class TestReplay(unittest.TestCase):
                 "session_id": "session_replay_test",
                 "source_seq": 1,
                 "trace_id": "trace_replay_test",
+                "decision_cycle_id": "dc_replay_test",
                 "severity": "info",
                 "payload": {
                     "signal_type": "ict_sweep",
