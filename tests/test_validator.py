@@ -67,7 +67,7 @@ class TestValidator(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             path = Path(tmp_dir)
             event_file = path / "events.jsonl"
-            event = {
+            ev_signal = {
                 "event_id": "00000000-0000-0000-0000-000000000012",
                 "event_type": "signal_evaluated",
                 "event_version": 1,
@@ -88,10 +88,29 @@ class TestValidator(unittest.TestCase):
                     "confidence": 0.7,
                 },
             }
-            event_file.write_text(json.dumps(event) + "\n", encoding="utf-8")
+            ev_terminal = {
+                "event_id": "00000000-0000-0000-0000-000000000013",
+                "event_type": "trade_action",
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:05Z",
+                "ingested_at_utc": "2026-03-29T18:00:05Z",
+                "source_system": "quantbuild",
+                "source_component": "decision_engine",
+                "environment": "paper",
+                "run_id": "run_test_ok",
+                "session_id": "session_test_ok",
+                "source_seq": 1,
+                "trace_id": "trace_test_ok",
+                "decision_cycle_id": "dc_ok_signal_evaluated",
+                "severity": "info",
+                "payload": {"decision": "NO_ACTION", "reason": "no_setup"},
+            }
+            event_file.write_text(
+                json.dumps(ev_signal) + "\n" + json.dumps(ev_terminal) + "\n", encoding="utf-8"
+            )
 
             report = validate_path(path)
-            self.assertEqual(report.events_valid, 1)
+            self.assertEqual(report.events_valid, 2)
             self.assertEqual(len([issue for issue in report.issues if issue.level == "error"]), 0)
 
     def test_quantbuild_chain_requires_decision_cycle_id(self) -> None:
@@ -155,7 +174,7 @@ class TestValidator(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             path = Path(tmp_dir)
             event_file = path / "events.jsonl"
-            event = {
+            ev_signal = {
                 "event_id": "00000000-0000-0000-0000-000000000022",
                 "event_type": "signal_evaluated",
                 "event_version": 1,
@@ -208,9 +227,28 @@ class TestValidator(unittest.TestCase):
                     "threshold_snapshot": {"min_combo_required": 3},
                 },
             }
-            event_file.write_text(json.dumps(event) + "\n", encoding="utf-8")
+            ev_terminal = {
+                "event_id": "00000000-0000-0000-0000-000000000024",
+                "event_type": "trade_action",
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:05Z",
+                "ingested_at_utc": "2026-03-29T18:00:05Z",
+                "source_system": "quantbuild",
+                "source_component": "decision_engine",
+                "environment": "paper",
+                "run_id": "run_upgrade",
+                "session_id": "session_upgrade",
+                "source_seq": 1,
+                "trace_id": "trace_upgrade",
+                "decision_cycle_id": "dc_upgrade_desk_grade",
+                "severity": "info",
+                "payload": {"decision": "NO_ACTION", "reason": "no_setup"},
+            }
+            event_file.write_text(
+                json.dumps(ev_signal) + "\n" + json.dumps(ev_terminal) + "\n", encoding="utf-8"
+            )
             report = validate_path(path)
-            self.assertEqual(report.events_valid, 1)
+            self.assertEqual(report.events_valid, 2)
             self.assertEqual(len([i for i in report.issues if i.level == "error"]), 0)
 
     def test_signal_evaluated_invalid_gate_summary_status_errors(self) -> None:
@@ -357,6 +395,7 @@ class TestValidator(unittest.TestCase):
                 **base,
                 "event_id": "00000000-0000-0000-0000-000000000017",
                 "event_type": "trade_action",
+                "decision_cycle_id": "dc_seq_mono_2",
                 "source_seq": 1,
                 "payload": {"decision": "NO_ACTION", "reason": "cooldown_active"},
             }
@@ -373,7 +412,7 @@ class TestValidator(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             path = Path(tmp_dir)
             event_file = path / "events.jsonl"
-            event = {
+            ev_sd = {
                 "event_id": "00000000-0000-0000-0000-000000000018",
                 "event_type": "signal_detected",
                 "event_version": 1,
@@ -398,9 +437,28 @@ class TestValidator(unittest.TestCase):
                     "regime": "trend",
                 },
             }
-            event_file.write_text(json.dumps(event) + "\n", encoding="utf-8")
+            ev_terminal = {
+                "event_id": "00000000-0000-0000-0000-000000000029",
+                "event_type": "trade_action",
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:05Z",
+                "ingested_at_utc": "2026-03-29T18:00:05Z",
+                "source_system": "quantbuild",
+                "source_component": "decision_engine",
+                "environment": "paper",
+                "run_id": "run_sd",
+                "session_id": "session_sd",
+                "source_seq": 1,
+                "trace_id": "trace_sd",
+                "decision_cycle_id": "dc_signal_detected_min",
+                "severity": "info",
+                "payload": {"decision": "NO_ACTION", "reason": "no_setup"},
+            }
+            event_file.write_text(
+                json.dumps(ev_sd) + "\n" + json.dumps(ev_terminal) + "\n", encoding="utf-8"
+            )
             report = validate_path(path)
-            self.assertEqual(report.events_valid, 1)
+            self.assertEqual(report.events_valid, 2)
             self.assertEqual(len([i for i in report.issues if i.level == "error"]), 0)
 
     def test_signal_filtered_reason_must_be_canonical(self) -> None:
@@ -456,6 +514,122 @@ class TestValidator(unittest.TestCase):
             report = validate_path(path)
             error_messages = [issue.message for issue in report.issues if issue.level == "error"]
             self.assertIn("invalid_trade_executed_direction: BUY", error_messages)
+
+    def test_decision_cycle_requires_terminal_trade_action(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir)
+            event_file = path / "events.jsonl"
+            ev = {
+                "event_id": "00000000-0000-0000-0000-000000000071",
+                "event_type": "signal_evaluated",
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:00Z",
+                "ingested_at_utc": "2026-03-29T18:00:01Z",
+                "source_system": "quantbuild",
+                "source_component": "signal_engine",
+                "environment": "paper",
+                "run_id": "run_miss_ta",
+                "session_id": "session_miss_ta",
+                "source_seq": 1,
+                "trace_id": "trace_miss_ta",
+                "decision_cycle_id": "dc_missing_terminal",
+                "severity": "info",
+                "payload": {
+                    "signal_type": "ict_sweep",
+                    "signal_direction": "LONG",
+                    "confidence": 0.5,
+                },
+            }
+            event_file.write_text(json.dumps(ev) + "\n", encoding="utf-8")
+            report = validate_path(path)
+            msgs = [i.message for i in report.issues if i.level == "error"]
+            self.assertTrue(any(m.startswith("decision_cycle_missing_trade_action") for m in msgs))
+
+    def test_decision_cycle_rejects_duplicate_trade_action(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir)
+            event_file = path / "events.jsonl"
+            base = {
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:03Z",
+                "ingested_at_utc": "2026-03-29T18:00:03Z",
+                "source_system": "quantbuild",
+                "environment": "paper",
+                "run_id": "run_dup_ta",
+                "session_id": "session_dup_ta",
+                "trace_id": "trace_dup_ta",
+                "decision_cycle_id": "dc_dup_trade_action",
+                "severity": "info",
+            }
+            a = {
+                **base,
+                "event_id": "00000000-0000-0000-0000-000000000081",
+                "event_type": "trade_action",
+                "source_component": "decision_engine",
+                "source_seq": 1,
+                "payload": {"decision": "NO_ACTION", "reason": "no_setup"},
+            }
+            b = {
+                **base,
+                "event_id": "00000000-0000-0000-0000-000000000082",
+                "event_type": "trade_action",
+                "source_component": "decision_engine",
+                "source_seq": 2,
+                "payload": {"decision": "NO_ACTION", "reason": "cooldown_active"},
+            }
+            event_file.write_text(json.dumps(a) + "\n" + json.dumps(b) + "\n", encoding="utf-8")
+            report = validate_path(path)
+            msgs = [i.message for i in report.issues if i.level == "error"]
+            self.assertTrue(any(m.startswith("duplicate_trade_action_decision_cycle") for m in msgs))
+
+    def test_decision_chain_order_trade_action_must_follow_signal_evaluated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir)
+            event_file = path / "events.jsonl"
+            ta_first = {
+                "event_id": "00000000-0000-0000-0000-000000000091",
+                "event_type": "trade_action",
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:01Z",
+                "ingested_at_utc": "2026-03-29T18:00:01Z",
+                "source_system": "quantbuild",
+                "source_component": "decision_engine",
+                "environment": "paper",
+                "run_id": "run_ord",
+                "session_id": "session_ord",
+                "source_seq": 1,
+                "trace_id": "trace_ord",
+                "decision_cycle_id": "dc_bad_order",
+                "severity": "info",
+                "payload": {"decision": "NO_ACTION", "reason": "no_setup"},
+            }
+            se_second = {
+                "event_id": "00000000-0000-0000-0000-000000000092",
+                "event_type": "signal_evaluated",
+                "event_version": 1,
+                "timestamp_utc": "2026-03-29T18:00:05Z",
+                "ingested_at_utc": "2026-03-29T18:00:05Z",
+                "source_system": "quantbuild",
+                "source_component": "signal_engine",
+                "environment": "paper",
+                "run_id": "run_ord",
+                "session_id": "session_ord",
+                "source_seq": 1,
+                "trace_id": "trace_ord",
+                "decision_cycle_id": "dc_bad_order",
+                "severity": "info",
+                "payload": {
+                    "signal_type": "ict_sweep",
+                    "signal_direction": "LONG",
+                    "confidence": 0.5,
+                },
+            }
+            event_file.write_text(
+                json.dumps(ta_first) + "\n" + json.dumps(se_second) + "\n", encoding="utf-8"
+            )
+            report = validate_path(path)
+            msgs = [i.message for i in report.issues if i.level == "error"]
+            self.assertTrue(any(m.startswith("decision_chain_order_violation") for m in msgs))
 
     def test_market_data_stale_warning_valid_minimal_payload(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

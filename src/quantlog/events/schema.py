@@ -15,6 +15,14 @@ DECISION_CHAIN_EVENT_TYPES: Final[frozenset[str]] = frozenset(
     }
 )
 
+# Monotonic order within a single decision_cycle_id (see QUANT_STACK_CANONICAL_IDS_AND_GRAINS).
+DECISION_CHAIN_EVENT_ORDER_RANK: Final[dict[str, int]] = {
+    "signal_detected": 0,
+    "signal_evaluated": 1,
+    "risk_guard_decision": 2,
+    "trade_action": 3,
+}
+
 REQUIRED_ENVELOPE_FIELDS: Final[set[str]] = {
     "event_id",
     "event_type",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -25,6 +25,7 @@ from quantlog.events.schema import (
     TRADE_ACTION_DECISIONS,
     TRADE_EXECUTED_DIRECTIONS,
     DECISION_CHAIN_EVENT_TYPES,
+    DECISION_CHAIN_EVENT_ORDER_RANK,
 )
 
 
@@ -515,6 +516,89 @@ def validate_raw_event(raw_line: RawEventLine) -> list[ValidationIssue]:
     return issues
 
 
+@dataclass(slots=True, frozen=True)
+class _DecisionChainAnchor:
+    path: Path
+    line_number: int
+    decision_cycle_id: str
+    event_type: str
+    sort_key: tuple[Any, ...]
+
+
+_FALLBACK_SORT_END = datetime(9999, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+
+
+def _timestamp_sort_key(timestamp_utc: Any, path: Path, line_number: int) -> tuple[Any, ...]:
+    if isinstance(timestamp_utc, str):
+        try:
+            dt = datetime.fromisoformat(timestamp_utc.replace("Z", "+00:00"))
+            return (dt, str(path), line_number)
+        except ValueError:
+            pass
+    return (_FALLBACK_SORT_END, str(path), line_number)
+
+
+def _decision_cycle_sequence_issues(anchors: list[_DecisionChainAnchor]) -> list[ValidationIssue]:
+    """Cross-event checks per ``decision_cycle_id`` (QuantBuild chain only)."""
+    issues: list[ValidationIssue] = []
+    by_cycle: dict[str, list[_DecisionChainAnchor]] = {}
+    for a in anchors:
+        by_cycle.setdefault(a.decision_cycle_id, []).append(a)
+
+    for dc_id, group in by_cycle.items():
+        sorted_group = sorted(group, key=lambda x: x.sort_key)
+        trade_lines = [x for x in sorted_group if x.event_type == "trade_action"]
+
+        if not trade_lines:
+            last = sorted_group[-1]
+            issues.append(
+                ValidationIssue(
+                    level="error",
+                    path=last.path,
+                    line_number=last.line_number,
+                    message=f"decision_cycle_missing_trade_action: decision_cycle_id={dc_id!r}",
+                )
+            )
+        elif len(trade_lines) > 1:
+            for dup in trade_lines:
+                issues.append(
+                    ValidationIssue(
+                        level="error",
+                        path=dup.path,
+                        line_number=dup.line_number,
+                        message=(
+                            "duplicate_trade_action_decision_cycle: "
+                            f"decision_cycle_id={dc_id!r}"
+                        ),
+                    )
+                )
+
+        prev_rank = -1
+        prev_type: str | None = None
+        for a in sorted_group:
+            rank = DECISION_CHAIN_EVENT_ORDER_RANK.get(a.event_type)
+            if rank is None:
+                continue
+            if rank < prev_rank:
+                issues.append(
+                    ValidationIssue(
+                        level="error",
+                        path=a.path,
+                        line_number=a.line_number,
+                        message=(
+                            "decision_chain_order_violation: "
+                            f"decision_cycle_id={dc_id!r} "
+                            f"after_event_type={prev_type!r} "
+                            f"event_type={a.event_type!r}"
+                        ),
+                    )
+                )
+            prev_rank = max(prev_rank, rank)
+            prev_type = a.event_type
+
+    return issues
+
+
 def _monotonic_source_seq_issues(
     raw_line: RawEventLine, seq_last: dict[str, int]
 ) -> list[ValidationIssue]:
@@ -561,7 +645,8 @@ def validate_path(path: Path) -> ValidationReport:
     jsonl_files = discover_jsonl_files(path)
     issues: list[ValidationIssue] = []
     lines_scanned = 0
-    events_valid = 0
+    schema_ok_lines: set[tuple[Path, int]] = set()
+    chain_anchors: list[_DecisionChainAnchor] = []
 
     for jsonl_path in jsonl_files:
         seq_last: dict[str, int] = {}
@@ -571,13 +656,42 @@ def validate_path(path: Path) -> ValidationReport:
             mono_issues = _monotonic_source_seq_issues(raw_line, seq_last)
             combined = event_issues + mono_issues
             issues.extend(combined)
-            if not any(issue.level == "error" for issue in combined):
-                events_valid += 1
+            line_ok = not any(issue.level == "error" for issue in combined)
+            if line_ok:
+                schema_ok_lines.add((raw_line.path, raw_line.line_number))
+
+            ev = raw_line.parsed
+            if isinstance(ev, dict) and line_ok:
+                dc = ev.get("decision_cycle_id")
+                et = ev.get("event_type")
+                ts = ev.get("timestamp_utc")
+                if (
+                    ev.get("source_system") == "quantbuild"
+                    and isinstance(et, str)
+                    and et in DECISION_CHAIN_EVENT_TYPES
+                    and isinstance(dc, str)
+                    and dc.strip()
+                ):
+                    chain_anchors.append(
+                        _DecisionChainAnchor(
+                            path=raw_line.path,
+                            line_number=raw_line.line_number,
+                            decision_cycle_id=dc.strip(),
+                            event_type=et,
+                            sort_key=_timestamp_sort_key(ts, raw_line.path, raw_line.line_number),
+                        )
+                    )
+
+    seq_issues = _decision_cycle_sequence_issues(chain_anchors)
+    issues.extend(seq_issues)
+    for si in seq_issues:
+        if si.level == "error":
+            schema_ok_lines.discard((si.path, si.line_number))
 
     return ValidationReport(
         files_scanned=len(jsonl_files),
         lines_scanned=lines_scanned,
-        events_valid=events_valid,
+        events_valid=len(schema_ok_lines),
         issues=issues,
     )
 
