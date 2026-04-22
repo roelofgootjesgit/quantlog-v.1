@@ -40,7 +40,7 @@ REQUIRED_ENVELOPE_FIELDS: Final[set[str]] = {
     "payload",
 }
 
-ALLOWED_SOURCE_SYSTEMS: Final[set[str]] = {"quantbuild", "quantbridge", "quantlog"}
+ALLOWED_SOURCE_SYSTEMS: Final[set[str]] = {"quantbuild", "quantbridge", "quantlog", "execution"}
 ALLOWED_SEVERITIES: Final[set[str]] = {"info", "warn", "error", "critical"}
 ALLOWED_ENVIRONMENTS: Final[set[str]] = {"paper", "dry_run", "live", "shadow"}
 
